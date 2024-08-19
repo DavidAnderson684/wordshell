@@ -1,7 +1,7 @@
 #!/bin/bash
 # Note - if you change that path to bash, then you should also change it in the configuration section below
 
-VERSION="1.3.140 (2017-12-01)"
+VERSION="1.4.1 (2024-08-19)"
 
 # (c) David Anderson 2011-
 #
@@ -90,7 +90,7 @@ EXCLUDE_GLOB_FTP="wponlinebackup/tmp/*"
 EXCLUDE_GLOB_RSYNC="wponlinebackup/tmp/*"
 
 # Where to fetch a wp-wordshell-controller.php script of sufficiently high protocol from
-REMOTE_MANAGER_MINIMUM_PROTOCOL=22
+REMOTE_MANAGER_MINIMUM_PROTOCOL=23
 REMOTE_MANAGER_FROM="https://wordshellnet.s3.amazonaws.com/wp-wordshell-controller.php.$REMOTE_MANAGER_MINIMUM_PROTOCOL"
 
 SELINUX=0
@@ -3855,8 +3855,12 @@ if [[ -n $LFTP ]]; then
 	[[ $CLS_OUTPUT =~ ^$FILE/? ]] && return 1
 	return 0
 else
-	# Curl
-	[[ $DEBUG -ge 1 ]] && ws_event_info "ftp_checkfileexistence curl $ACCESSMETHOD://$FTPUSER@$FTPHOST/$FTPDIR/$FILE"
+	# Curl -does not like a double /
+	local FTPURL=$ACCESSMETHOD://$FTPUSER@$FTPHOST/$FTPDIR/$FILE
+	if [[ -z $FTPDIR ]]; then
+		FTPURL=$ACCESSMETHOD://$FTPUSER@$FTPHOST/$FILE
+	fi
+	[[ $DEBUG -ge 1 ]] && ws_event_info "ftp_checkfileexistence curl $FTPURL"
 	local OURCURLVERB=$CURLVERB
 	[[ $OURCURLVERB = "--silent --show-error" ]] && OURCURLVERB="--silent"
 	if [[ $ISDIR -eq 1 ]]; then
@@ -3868,7 +3872,7 @@ else
 			OURCURLVERB="$OURCURLVERB --ftp-create-dirs"
 		fi
 		local CURLOUTFILE=`mktemp "$WORKINGDIR_FULL/tmp/curlout.XXXXX"`
-		echo -e "user = \"$FTPUSER:$FTPPASS\"\n" | $CURL $OURCURLVERB $CURL_FTPOPTIONS --config - --url "$ACCESSMETHOD://$FTPHOST/$FTPDIR/$FILE/" >"$CURLOUTFILE"
+		echo -e "user = \"$FTPUSER:$FTPPASS\"\n" | $CURL $OURCURLVERB $CURL_FTPOPTIONS --config - --url "$FTPURL/" >"$CURLOUTFILE"
 		local CURL_RET=$?
 		if [ $CURL_RET -eq 19 -o $CURL_RET -eq 87 ]; then
 			# Curl error: RETR failed / unable to parse list
@@ -3896,7 +3900,7 @@ else
 		fi
 	else
 		# File
-		echo -e "user = \"$FTPUSER:$FTPPASS\"" | $CURL $OURCURLVERB $CURL_FTPOPTIONS --config - --url "$ACCESSMETHOD://$FTPHOST/$FTPDIR/$FILE" --output /dev/null
+		echo -e "user = \"$FTPUSER:$FTPPASS\"" | $CURL $OURCURLVERB $CURL_FTPOPTIONS --config - --url "$FTPURL" --output /dev/null
 		local CURLRET=$?
 		if [[ $CURLRET -eq 19 || $CURLRET -eq 78 ]]; then
 			return 0
