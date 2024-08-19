@@ -1,12 +1,12 @@
 <?php
-$wordshell_version = "0.4.6 (2016-05-28)";
+$wordshell_version = "0.5.0 (2024-08-19)";
 
 # This is the helper script. You do not run it directly. You can place it in ~/.wordshell (or wherever you configured WordShell to use).
 
 # Keep this as a monotically increasing integer for simplicity
 # This line should not have its format changed, nor similar lines added before it; it is read from bash
 # Protocol versions change in step with new releases of wordshell requiring newly available commands
-$proto_version = "22";
+$proto_version = "23";
 
 @set_time_limit(300);
 
@@ -1121,43 +1121,81 @@ function wordshell_wpc_coreupgrade() {
 	global $wordshell_update_output;
 	$wordshell_update_output = "";
 
-/**
- * A Upgrader Skin for WordPress that only generates plain-text
- *
- * Adapted with thanks from the wp-cli project under the GPL
- */
-class WordShell_Upgrader_Skin extends WP_Upgrader_Skin {
+	/**
+	 * A Upgrader Skin for WordPress that only generates plain-text
+	 *
+	 * Adapted with thanks from the wp-cli project under the GPL
+	 */
+	if (version_compare($from_api->version_checked, '5.3', '<')) {
+	
+		class WordShell_Upgrader_Skin extends WP_Upgrader_Skin {
 
-	function header() {}
-	function footer() {}
-	function bulk_header() {}
-	function bulk_footer() {}
+			function header() {}
+			function footer() {}
+			function bulk_header() {}
+			function bulk_footer() {}
 
-	function error( $error ) {
-		if ( !$error )
-			return;
-		print_r($error);
-	}
+			function error( $error ) {
+				if ( !$error )
+					return;
+				print_r($error);
+			}
 
-	function feedback( $string ) {
+			function feedback( $string ) {
 
-		global $wordshell_update_output;
+				global $wordshell_update_output;
 
-		if ( isset( $this->upgrader->strings[$string] ) ) { $string = $this->upgrader->strings[$string]; }
+				if ( isset( $this->upgrader->strings[$string] ) ) { $string = $this->upgrader->strings[$string]; }
 
-		if ( strpos($string, '%') !== false ) {
-			$args = func_get_args();
-			$args = array_splice($args, 1);
-			if ( !empty($args) ) { $string = vsprintf($string, $args); }
+				if ( strpos($string, '%') !== false ) {
+					$args = func_get_args();
+					$args = array_splice($args, 1);
+					if ( !empty($args) ) { $string = vsprintf($string, $args); }
+				}
+
+				if ( empty($string) ) { return; }
+
+				$string = str_replace( '&#8230;', '...', strip_tags( $string ) );
+
+				$wordshell_update_output .= $string."\n";
+			}
 		}
 
-		if ( empty($string) ) { return; }
-
-		$string = str_replace( '&#8230;', '...', strip_tags( $string ) );
-
-		$wordshell_update_output .= $string."\n";
+	} else {
+		class WordShell_Upgrader_Skin extends WP_Upgrader_Skin {
+			
+			function header() {}
+			function footer() {}
+			function bulk_header() {}
+			function bulk_footer() {}
+			
+			function error( $error ) {
+				if ( !$error )
+					return;
+				print_r($error);
+			}
+			
+			function feedback( $string, ...$args ) {
+				
+				global $wordshell_update_output;
+				
+				$string = strip_tags( strip_tags );
+				if ( isset( $this->upgrader->strings[$string] ) ) { $string = $this->upgrader->strings[$string]; }
+				
+				if ( strpos($string, '%') !== false ) {
+					$args   = array_map( 'strip_tags', $args );
+					//$args   = array_map( 'esc_html', $args );
+					$string = vsprintf( $string, $args );
+				}
+				
+				if ( empty($string) ) { return; }
+				
+				$string = str_replace( '&#8230;', '...', $string );
+				
+				$wordshell_update_output .= $string."\n";
+			}
+		}
 	}
-}
 
 	$updater = new Core_Upgrader(new WordShell_Upgrader_Skin);
 	$result = $updater->upgrade( $update );
