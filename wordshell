@@ -1,7 +1,7 @@
 #!/bin/bash
 # Note - if you change that path to bash, then you should also change it in the configuration section below
 
-VERSION="1.4.1 (2024-08-19)"
+VERSION="1.5.0 (2024-09-14)"
 
 # (c) David Anderson 2011-
 #
@@ -93,8 +93,11 @@ EXCLUDE_GLOB_RSYNC="wponlinebackup/tmp/*"
 REMOTE_MANAGER_MINIMUM_PROTOCOL=23
 REMOTE_MANAGER_FROM="https://wordshellnet.s3.amazonaws.com/wp-wordshell-controller.php.$REMOTE_MANAGER_MINIMUM_PROTOCOL"
 
+# SELinux mode
 SELINUX=0
 [[ $UNAME = "Linux" ]] && selinuxenabled 2>/dev/null && SELINUX=1
+# Valid values here are "restorecon" (which runs the "restorecon" binary to set contexts) and "reference"  (which instead sets the contexts using "chcon" binary using other files to provide a reference value)
+SELINUX_MODE="restorecon"
 
 # sed -i is not part of POSIX; an -i option is present on BSDs but works differently to GNU.
 # Must provide the filename as $2
@@ -124,10 +127,19 @@ if [[ $UNAME = "Linux" || $UNAME =~ ^Cygwin || $UNAME =~ ^CYGWIN ]]; then
 		chown -R --reference="$1" "$2"/*
 		if [[ $SELINUX -eq 1 ]]; then
 			if [[ $DEBUG -ge 1 ]]; then
-				ws_event_debug "setownership: SELinux chcon: contents: $2"
-				chcon -R --reference="$1" "$2"/*
+				if [[ $SELINUX_MODE = "reference" ]]; then
+					ws_event_debug "setownership: SELinux chcon: contents: $2"
+					chcon -R --reference="$1" "$2"/*
+				else
+					ws_event_debug "setownership: SELinux restorecon contents: $2"
+					restorecon -r -v "$2"
+				fi
 			else
-				chcon -R --reference="$1" "$2"/* 2>/dev/null
+				if [[ $SELINUX_MODE = "reference" ]]; then
+					chcon -R --reference="$1" "$2"/* 2>/dev/null
+				else
+					restorecon -r "$2"
+				fi
 			fi
 		fi
 	else
@@ -135,10 +147,18 @@ if [[ $UNAME = "Linux" || $UNAME =~ ^Cygwin || $UNAME =~ ^CYGWIN ]]; then
 		chown -R --reference="$1" "$2"
 		if [[ $SELINUX -eq 1 ]]; then
 			if [[ $DEBUG -ge 1 ]]; then
-				ws_event_debug "setownership: SELinux chcon: $2"
-				chcon -R --reference="$1" "$2"
+				if [[ $SELINUX_MODE = "reference" ]]; then
+					ws_event_debug "setownership: SELinux chcon: $2"
+					chcon -R --reference="$1" "$2"
+				else
+					restorecon -r -v "$2"
+				fi
 			else
-				chcon -R --reference="$1" "$2" 2>/dev/null
+				if [[ $SELINUX_MODE = "reference" ]]; then
+					chcon -R --reference="$1" "$2" 2>/dev/null
+				else
+					restorecon -r "$2"
+				fi
 			fi
 		fi
 	fi
@@ -7162,3 +7182,4 @@ fi
 [[ $DEBUG -ge 1 ]] && ws_event_debug "Finished: reached the end of the code"
 
 exit
+
